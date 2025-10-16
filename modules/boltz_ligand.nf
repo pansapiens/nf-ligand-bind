@@ -1,0 +1,89 @@
+process CREATE_BOLTZ_YAML_LIGAND {
+    tag "${target_meta.id}_${ligand_meta.id}"
+
+    container 'ghcr.io/australian-protein-design-initiative/containers/nf-binder-design-utils:0.1.4'
+
+    input:
+    tuple val(target_meta), path(target_pdb), val(ligand_meta)
+
+    output:
+    tuple val(meta), path(yaml_file), path(target_pdb)
+
+    script:
+    def target_name = target_meta.id
+    def ligand_id = ligand_meta.id
+    def id = "${target_name}_${ligand_id}"
+    def template_force_flag = params.boltz_template_force ? '--template-force' : ''
+    def template_threshold_flag = params.boltz_template_threshold ? "--template-threshold ${params.boltz_template_threshold}" : ''
+    def no_templates_flag = params.boltz_use_template ? '' : '--no-templates'
+
+    meta = [
+        id: id,
+        target: target_name,
+        ligand: ligand_id,
+    ]
+    yaml_file = "${id}.yml"
+
+    """
+    ${projectDir}/bin/create_boltz_yaml_ligand.py \
+        --target-pdb '${target_pdb}' \
+        --ligand-smiles '${ligand_meta.smiles}' \
+        --output-yaml '${yaml_file}' \
+        ${template_force_flag} \
+        ${template_threshold_flag} \
+        ${no_templates_flag}
+    """
+}
+
+process BOLTZ_LIGAND {
+    tag "${meta.id}"
+    container 'ghcr.io/australian-protein-design-initiative/containers/boltz:v2.2.1'
+    publishDir "${params.outdir}/boltz/${meta.target}", mode: 'copy'
+
+    input:
+    tuple val(meta), path(yaml_file), path(target_pdb)
+
+    output:
+    path ("boltz_results_${meta.id}"), emit: results
+    tuple val(meta), path("boltz_results_${meta.id}/predictions/${meta.id}/*.cif"), emit: predicted_structure, optional: true
+    tuple val(meta), path("boltz_results_${meta.id}/predictions/${meta.id}/confidence_${meta.id}_model_0.json"), emit: confidence_json, optional: true
+    tuple val(meta), path("boltz_results_${meta.id}/predictions/${meta.id}/affinity_*.json"), emit: affinity_json, optional: true
+
+    script:
+    def use_msa_server_flag = params.use_msa_server ? '--use_msa_server' : ''
+    def args = task.ext.args ?: ''
+    """
+    # Find least-used GPU (by active processes and VRAM) and set CUDA_VISIBLE_DEVICES
+    if [[ -n "${params.gpu_devices}" && "${params.gpu_devices}" != "null" ]]; then
+        if [[ -f "${projectDir}/bin/find_available_gpu.py" ]]; then
+            free_gpu=\$(${projectDir}/bin/find_available_gpu.py "${params.gpu_devices}" --verbose --exclude "${params.gpu_allocation_detect_process_regex}" --random-wait 2)
+            export CUDA_VISIBLE_DEVICES="\$free_gpu"
+            echo "Set CUDA_VISIBLE_DEVICES=\$free_gpu"
+        else
+            echo "Warning: find_available_gpu.py not found, skipping GPU selection"
+        fi
+    fi
+
+    # Boltz model weights are stored in our container
+    export BOLTZ_CACHE=\${BOLTZ_CACHE:-/app/boltz/cache}
+
+    # Create various tmp/cache directories that are expected to be in \$HOME by default
+    export NUMBA_CACHE_DIR="\$(pwd)/.numba_cache"
+    mkdir -p \$NUMBA_CACHE_DIR
+    export XDG_CONFIG_HOME="\$(pwd)/.config"
+    mkdir -p \$XDG_CONFIG_HOME
+    export TRITON_CACHE_DIR="\$(pwd)/.triton_cache"
+    mkdir -p \$TRITON_CACHE_DIR
+
+    # Prevent Python from using ~/.local/lib/ packages mounted inside the container
+    export PYTHONNOUSERSITE=1
+
+    boltz predict \
+        ${args} \
+        ${use_msa_server_flag} \
+        --preprocessing-threads ${task.cpus} \
+        --num_workers ${task.cpus} \
+        --cache \$BOLTZ_CACHE \
+        ${yaml_file}
+    """
+}

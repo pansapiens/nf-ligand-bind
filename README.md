@@ -31,7 +31,7 @@ Run:
 ```bash
 nextflow run main.nf \
 --outdir results \
---target_pdbs "./input_pdbs/" \
+--target_pdbs "./input/" \
 --ligand_csv "./input/ligands.csv" \
 -resume
 ```
