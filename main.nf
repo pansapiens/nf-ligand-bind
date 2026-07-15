@@ -18,9 +18,8 @@ include { CREATE_BOLTZ_YAML_LIGAND ; BOLTZ_LIGAND } from './modules/boltz_ligand
 
 process ADD_INCHIKEY {
     tag "add_inchikey"
-    // TODO: Make a new nf-binder-design-utils version with uv and rdkit installed
-    // container 'ghcr.io/australian-protein-design-initiative/containers/nf-binder-design-utils:0.1.4'
-    container 'ghcr.io/astral-sh/uv:python3.13-trixie-slim'
+    // boltz image has rdkit + /usr/bin/ps (needed for Nextflow metrics under --cleanenv)
+    container 'ghcr.io/australian-protein-design-initiative/containers/boltz:v2.2.1-2'
     publishDir "${params.outdir}", mode: 'copy'
 
     input:
@@ -31,7 +30,7 @@ process ADD_INCHIKEY {
 
     script:
     """
-    uv run ${projectDir}/bin/add_inchikey.py \
+    python3 ${projectDir}/bin/add_inchikey.py \
         "${ligands_csv}" \
         -o ligands_with_inchikey.csv \
         --smiles-column ligand \
@@ -48,7 +47,7 @@ workflow {
 
     // Run DynamicBind (unless skipped)
     if (!params.skip_dynamicbind) {
-        DYNAMICBIND(ch_target_pdbs, ch_ligand_csv, 20, 3, false)
+        DYNAMICBIND(ch_target_pdbs, ch_ligand_csv, 20, 3, true)
     }
 
     // Run Boltz ligand prediction (unless skipped)

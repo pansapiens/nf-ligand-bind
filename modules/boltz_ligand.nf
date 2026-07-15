@@ -1,7 +1,7 @@
 process CREATE_BOLTZ_YAML_LIGAND {
     tag "${target_meta.id}_${ligand_meta.id}"
 
-    container 'ghcr.io/australian-protein-design-initiative/containers/nf-binder-design-utils:0.1.4'
+    container 'ghcr.io/australian-protein-design-initiative/containers/boltz:v2.2.1-2'
 
     input:
     tuple val(target_meta), path(target_pdb), val(ligand_meta)
@@ -25,7 +25,7 @@ process CREATE_BOLTZ_YAML_LIGAND {
     yaml_file = "${id}.yml"
 
     """
-    ${projectDir}/bin/create_boltz_yaml_ligand.py \
+    python3 ${projectDir}/bin/create_boltz_yaml_ligand.py \
         --target-pdb '${target_pdb}' \
         --ligand-smiles '${ligand_meta.smiles}' \
         --output-yaml '${yaml_file}' \
@@ -37,17 +37,17 @@ process CREATE_BOLTZ_YAML_LIGAND {
 
 process BOLTZ_LIGAND {
     tag "${meta.id}"
-    container 'ghcr.io/australian-protein-design-initiative/containers/boltz:v2.2.1'
+    container 'ghcr.io/australian-protein-design-initiative/containers/boltz:v2.2.1-2'
     publishDir "${params.outdir}/boltz/${meta.target}", mode: 'copy'
 
     input:
     tuple val(meta), path(yaml_file), path(target_pdb)
 
     output:
-    path ("boltz_results_${meta.id}"), emit: results
-    tuple val(meta), path("boltz_results_${meta.id}/predictions/${meta.id}/*.cif"), emit: predicted_structure, optional: true
-    tuple val(meta), path("boltz_results_${meta.id}/predictions/${meta.id}/confidence_${meta.id}_model_0.json"), emit: confidence_json, optional: true
-    tuple val(meta), path("boltz_results_${meta.id}/predictions/${meta.id}/affinity_*.json"), emit: affinity_json, optional: true
+    path ("${meta.ligand}"), emit: results
+    tuple val(meta), path("${meta.ligand}/predictions/${meta.id}/*.cif"), emit: predicted_structure, optional: true
+    tuple val(meta), path("${meta.ligand}/predictions/${meta.id}/confidence_${meta.id}_model_0.json"), emit: confidence_json, optional: true
+    tuple val(meta), path("${meta.ligand}/predictions/${meta.id}/affinity_*.json"), emit: affinity_json, optional: true
 
     script:
     def use_msa_server_flag = params.use_msa_server ? '--use_msa_server' : ''
@@ -85,5 +85,8 @@ process BOLTZ_LIGAND {
         --num_workers ${task.cpus} \
         --cache \$BOLTZ_CACHE \
         ${yaml_file}
+
+    # Rename output folder from boltz_results_<id> to just the ligand inchikey
+    mv "boltz_results_${meta.id}" "${meta.ligand}"
     """
 }
