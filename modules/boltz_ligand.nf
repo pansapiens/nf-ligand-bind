@@ -20,7 +20,9 @@ process CREATE_BOLTZ_YAML_LIGAND {
     meta = [
         id: id,
         target: target_name,
-        ligand: ligand_id,
+        protein_path: target_pdb.name,
+        ligand: ligand_meta.smiles,
+        inchikey: ligand_id,
     ]
     yaml_file = "${id}.yml"
 
@@ -38,16 +40,18 @@ process CREATE_BOLTZ_YAML_LIGAND {
 process BOLTZ_LIGAND {
     tag "${meta.id}"
     container 'ghcr.io/australian-protein-design-initiative/containers/boltz:v2.2.1-2'
-    publishDir "${params.outdir}/boltz/${meta.target}", mode: 'copy'
+    publishDir "${params.outdir}/boltz/${meta.target}", mode: 'copy', pattern: "${meta.inchikey}/**"
+    publishDir "${params.outdir}/boltz/${meta.target}", mode: 'copy', pattern: "*_boltz_scores.csv"
 
     input:
     tuple val(meta), path(yaml_file), path(target_pdb)
 
     output:
-    path ("${meta.ligand}"), emit: results
-    tuple val(meta), path("${meta.ligand}/predictions/${meta.id}/*.cif"), emit: predicted_structure, optional: true
-    tuple val(meta), path("${meta.ligand}/predictions/${meta.id}/confidence_${meta.id}_model_0.json"), emit: confidence_json, optional: true
-    tuple val(meta), path("${meta.ligand}/predictions/${meta.id}/affinity_*.json"), emit: affinity_json, optional: true
+    path ("${meta.inchikey}"), emit: results
+    path ("${meta.id}_boltz_scores.csv"), emit: scores_csv
+    tuple val(meta), path("${meta.inchikey}/predictions/${meta.id}/*.cif"), emit: predicted_structure, optional: true
+    tuple val(meta), path("${meta.inchikey}/predictions/${meta.id}/confidence_${meta.id}_model_*.json"), emit: confidence_json, optional: true
+    tuple val(meta), path("${meta.inchikey}/predictions/${meta.id}/affinity_*.json"), emit: affinity_json, optional: true
 
     script:
     def use_msa_server_flag = params.use_msa_server ? '--use_msa_server' : ''
@@ -87,6 +91,16 @@ process BOLTZ_LIGAND {
         ${yaml_file}
 
     # Rename output folder from boltz_results_<id> to just the ligand inchikey
-    mv "boltz_results_${meta.id}" "${meta.ligand}"
+    mv "boltz_results_${meta.id}" "${meta.inchikey}"
+
+    affinity_json=\$(ls ${meta.inchikey}/predictions/${meta.id}/affinity_*.json | head -n 1)
+    python3 ${projectDir}/bin/parse_boltz_ligand_scores.py \
+        --affinity "\$affinity_json" \
+        --confidence ${meta.inchikey}/predictions/${meta.id}/confidence_${meta.id}_model_*.json \
+        --protein-path '${meta.protein_path}' \
+        --ligand '${meta.ligand}' \
+        --inchikey '${meta.inchikey}' \
+        --target '${meta.target}' \
+        -o '${meta.id}_boltz_scores.csv'
     """
 }

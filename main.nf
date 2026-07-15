@@ -15,6 +15,7 @@ params.skip_boltz = false
 
 include { DYNAMICBIND } from './modules/dynamicbind'
 include { CREATE_BOLTZ_YAML_LIGAND ; BOLTZ_LIGAND } from './modules/boltz_ligand'
+include { MERGE_AFFINITY } from './modules/merge_affinity'
 
 process ADD_INCHIKEY {
     tag "add_inchikey"
@@ -45,9 +46,13 @@ workflow {
     // Add InChIKey column and parse augmented ligands CSV
     ch_ligand_csv = ADD_INCHIKEY(ch_input_ligand_csv)
 
+    ch_boltz_scores = Channel.empty()
+    ch_dynamicbind_scores = Channel.empty()
+
     // Run DynamicBind (unless skipped)
     if (!params.skip_dynamicbind) {
         DYNAMICBIND(ch_target_pdbs, ch_ligand_csv, 20, 3, true)
+        ch_dynamicbind_scores = DYNAMICBIND.out.scores_csv
     }
 
     // Run Boltz ligand prediction (unless skipped)
@@ -82,5 +87,28 @@ workflow {
 
         // Run Boltz predictions
         BOLTZ_LIGAND(CREATE_BOLTZ_YAML_LIGAND.out)
+        ch_boltz_scores = BOLTZ_LIGAND.out.scores_csv
     }
+
+    // Concatenate per-process score CSVs (nf-binder-design collectFile pattern)
+    ch_boltz_affinity = ch_boltz_scores
+        .collectFile(
+            name: 'boltz_affinity.csv',
+            storeDir: "${params.outdir}",
+            keepHeader: true,
+            skip: 1,
+        )
+        .ifEmpty(file("${projectDir}/assets/empty_scores.csv"))
+
+    ch_dynamicbind_affinity = ch_dynamicbind_scores
+        .collectFile(
+            name: 'dynamicbind_affinity.csv',
+            storeDir: "${params.outdir}",
+            keepHeader: true,
+            skip: 1,
+        )
+        .ifEmpty(file("${projectDir}/assets/empty_scores.csv"))
+
+    // Join Boltz2 + DynamicBind into a single master affinity table
+    MERGE_AFFINITY(ch_boltz_affinity, ch_dynamicbind_affinity)
 }

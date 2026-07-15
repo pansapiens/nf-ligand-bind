@@ -1,5 +1,7 @@
 process DYNAMICBIND {
-    publishDir "${params.outdir}/dynamicbind/${target_pdb.simpleName}", mode: 'copy'
+    publishDir "${params.outdir}/dynamicbind/${target_pdb.simpleName}", mode: 'copy', pattern: '*.csv'
+    publishDir "${params.outdir}/dynamicbind/${target_pdb.simpleName}", mode: 'copy', pattern: '*/rank*.pdb'
+    publishDir "${params.outdir}/dynamicbind/${target_pdb.simpleName}", mode: 'copy', pattern: '*/rank*.sdf'
 
     container "ghcr.io/australian-protein-design-initiative/containers/dynamicbind:latest"
 
@@ -13,11 +15,12 @@ process DYNAMICBIND {
     output:
     path "complete_affinity_prediction.csv", emit: complete_affinity_prediction_csv
     path "affinity_prediction.csv", emit: affinity_prediction_csv
+    path "dynamicbind_affinity.csv", emit: scores_csv
     // Pose files are produced in non-HTS mode; HTS affinity screening may omit them.
     // Use rank* globs so DynamicBind's intermediate data/*.pdb is not published.
     path "*/rank*.pdb", emit: poses_pdb, optional: true
     path "*/rank*.sdf", emit: poses_sdf, optional: true
-    
+
     script:
     def args = task.ext.args ?: ''
     def hts_flag = hts ? '--hts' : ''
@@ -69,5 +72,11 @@ PY
         fi
         idx=\$((idx + 1))
     done < inchikeys.txt
+
+    # Format affinity table with inchikey metadata and dynamicbind_ prefixes
+    python3 ${projectDir}/bin/format_dynamicbind_affinity.py \
+        affinity_prediction.csv \
+        --ligands-csv ligands_for_dynamicbind.csv \
+        -o dynamicbind_affinity.csv
     """
 }
