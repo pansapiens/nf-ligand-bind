@@ -10,7 +10,7 @@ process DYNAMICBIND {
     path ligand_csv
     val inference_steps
     val savings_per_complex
-    val hts
+    val output_poses
 
     output:
     path "complete_affinity_prediction.csv", emit: complete_affinity_prediction_csv
@@ -23,7 +23,7 @@ process DYNAMICBIND {
 
     script:
     def args = task.ext.args ?: ''
-    def hts_flag = hts ? '--hts' : ''
+    def hts_flag = output_poses ? '' : '--hts'
     """
     mkdir -p data/esm2_output
 
@@ -62,7 +62,7 @@ PY
     mv results_tmp/*.csv .
 
     # Rename index directories to inchikeys based on CSV row order
-    awk -F',' 'NR>1 {print \$NF}' ligands_for_dynamicbind.csv > inchikeys.txt
+    awk -F',' 'NR>1 {print \$NF}' ligands_for_dynamicbind.csv | tr -d '\r' > inchikeys.txt
 
     idx=0
     while IFS= read -r inchikey; do

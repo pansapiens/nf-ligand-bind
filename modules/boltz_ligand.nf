@@ -40,8 +40,7 @@ process CREATE_BOLTZ_YAML_LIGAND {
 process BOLTZ_LIGAND {
     tag "${meta.id}"
     container 'ghcr.io/australian-protein-design-initiative/containers/boltz:v2.2.1-2'
-    publishDir "${params.outdir}/boltz/${meta.target}", mode: 'copy', pattern: "${meta.inchikey}/**"
-    publishDir "${params.outdir}/boltz/${meta.target}", mode: 'copy', pattern: "*_boltz_scores.csv"
+    publishDir "${params.outdir}/boltz/${meta.target}", mode: 'copy'
 
     input:
     tuple val(meta), path(yaml_file), path(target_pdb)

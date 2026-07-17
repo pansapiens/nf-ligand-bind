@@ -12,6 +12,7 @@ params.gpu_allocation_detect_process_regex = null
 params.use_msa_server = false
 params.skip_dynamicbind = false
 params.skip_boltz = false
+params.dynamicbind_output_poses = false
 
 include { DYNAMICBIND } from './modules/dynamicbind'
 include { CREATE_BOLTZ_YAML_LIGAND ; BOLTZ_LIGAND } from './modules/boltz_ligand'
@@ -51,7 +52,7 @@ workflow {
 
     // Run DynamicBind (unless skipped)
     if (!params.skip_dynamicbind) {
-        DYNAMICBIND(ch_target_pdbs, ch_ligand_csv, 20, 3, true)
+        DYNAMICBIND(ch_target_pdbs, ch_ligand_csv, 20, 3, params.dynamicbind_output_poses)
         ch_dynamicbind_scores = DYNAMICBIND.out.scores_csv
     }
 
