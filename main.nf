@@ -4,9 +4,12 @@ nextflow.enable.dsl = 2
 params.outdir = "results"
 params.target_pdbs = "input/*.pdb"
 params.ligand_csv = "input/ligands.csv"
-params.boltz_template_force = false
+// Boltz templates: the target structure is passed as a template with a forced
+// (restrained) backbone by default; --flexible relaxes the force restraints.
+params.boltz_template_force = true
 params.boltz_template_threshold = 1.0
-params.boltz_use_template = false
+params.boltz_use_template = true
+params.flexible = false
 params.gpu_devices = null
 params.gpu_allocation_detect_process_regex = null
 params.use_msa_server = false

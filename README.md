@@ -39,3 +39,18 @@ nextflow run main.nf \
 `--target_pdbs` is a directory containing `.pdb` files.
 
 Results are output to `results/{target_name}/`, one subdirectory per target protein.
+
+## Options
+
+Boltz-2 co-folds each target:ligand pair using the target structure as a template
+with forced (restrained) backbone coordinates by default:
+
+| Option | Default | Description |
+|---|---|---|
+| `--boltz_use_template` | `true` | pass the target PDB as a Boltz template |
+| `--boltz_template_force` | `true` | apply template force restraints (keeps output close to input coordinates) |
+| `--boltz_template_threshold` | `1.0` | template restraint distance threshold (Å) |
+| `--flexible` | off | turn off template force restraints while keeping the template |
+| `--use_msa_server` | off | fetch MSAs for Boltz (off by default; forced templates are usually sufficient) |
+| `--dynamicbind_output_poses` | off | run DynamicBind in pose-output mode instead of HTS screening |
+| `--skip_dynamicbind` / `--skip_boltz` | off | skip a predictor |

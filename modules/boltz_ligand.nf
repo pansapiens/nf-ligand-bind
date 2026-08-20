@@ -13,7 +13,9 @@ process CREATE_BOLTZ_YAML_LIGAND {
     def target_name = target_meta.id
     def ligand_id = ligand_meta.id
     def id = "${target_name}_${ligand_id}"
-    def template_force_flag = params.boltz_template_force ? '--template-force' : ''
+    // --flexible turns off the template force restraints while keeping the template
+    def use_force = params.boltz_template_force && !params.flexible
+    def template_force_flag = use_force ? '--template-force' : ''
     def template_threshold_flag = params.boltz_template_threshold ? "--template-threshold ${params.boltz_template_threshold}" : ''
     def no_templates_flag = params.boltz_use_template ? '' : '--no-templates'
 
