@@ -7,7 +7,7 @@ process CREATE_BOLTZ_YAML_LIGAND {
     tuple val(target_meta), path(target_pdb), val(ligand_meta)
 
     output:
-    tuple val(meta), path(yaml_file), path(target_pdb)
+    tuple val(meta), path(yaml_file), path(template_cif), path(target_pdb)
 
     script:
     def target_name = target_meta.id
@@ -18,6 +18,7 @@ process CREATE_BOLTZ_YAML_LIGAND {
     def template_force_flag = use_force ? '--template-force' : ''
     def template_threshold_flag = params.boltz_template_threshold ? "--template-threshold ${params.boltz_template_threshold}" : ''
     def no_templates_flag = params.boltz_use_template ? '' : '--no-templates'
+    template_cif = "${target_pdb.simpleName}_template.cif"
 
     meta = [
         id: id,
@@ -45,7 +46,7 @@ process BOLTZ_LIGAND {
     publishDir "${params.outdir}/boltz/${meta.target}", mode: 'copy'
 
     input:
-    tuple val(meta), path(yaml_file), path(target_pdb)
+    tuple val(meta), path(yaml_file), path(template_cif), path(target_pdb)
 
     output:
     path ("${meta.inchikey}"), emit: results

@@ -4,7 +4,10 @@ import argparse
 import yaml
 import sys
 import re
-from typing import Dict
+from pathlib import Path
+from typing import Dict, Optional
+
+import gemmi
 from Bio import PDB
 from Bio.PDB.Polypeptide import protein_letters_3to1, is_aa
 
@@ -48,6 +51,42 @@ def get_all_chain_sequences(pdb_file: str) -> Dict[str, str]:
         raise ValueError(f"No valid protein chains found in {pdb_file}")
 
     return sequences
+
+
+def make_template_cif(pdb_file: str) -> str:
+    """Convert a target PDB into a template-ready mmCIF.
+
+    Boltz parses template structures through its mmCIF path, which aligns each
+    chain against its entity full_sequence. PDBs without SEQRES (e.g. generated
+    by modelling tools) produce entities with empty full_sequence and Boltz
+    fails with IndexError. We set up entities and back-fill full_sequence from
+    the observed polymer residues, then write mmCIF.
+    """
+    st = gemmi.read_structure(pdb_file)
+    st.setup_entities()
+
+    subchain_seq: Dict[str, list] = {}
+    for chain in st[0]:
+        polymer = chain.get_polymer()
+        if len(polymer) == 0:
+            continue
+        subchain_seq[polymer[0].subchain] = [res.name for res in polymer]
+
+    for entity in st.entities:
+        if entity.entity_type != gemmi.EntityType.Polymer:
+            continue
+        if len(entity.full_sequence) > 0:
+            continue
+        for sub in entity.subchains:
+            if sub in subchain_seq:
+                entity.full_sequence = subchain_seq[sub]
+                break
+
+    stem = Path(pdb_file).with_suffix("").name + "_template.cif"
+    doc = st.make_mmcif_document()
+    doc.write_file(stem)
+    print(f"Wrote template mmCIF: {stem}", file=sys.stderr)
+    return stem
 
 
 def main():
@@ -112,13 +151,13 @@ def main():
         "sequences": sequences_list,
     }
 
+    # Always normalise the target to a template-ready mmCIF. Boltz template
+    # parsing on raw PDBs without SEQRES crashes (empty entity full_sequence).
+    template_cif = make_template_cif(args.target_pdb)
+
     # Add templates section (unless disabled)
     if not args.no_templates:
-        # Use 'pdb' key for PDB files, 'cif' for CIF files
-        if args.target_pdb.lower().endswith(".pdb"):
-            template_entry = {"pdb": args.target_pdb}
-        else:
-            template_entry = {"cif": args.target_pdb}
+        template_entry = {"cif": template_cif}
 
         if args.template_force:
             template_entry["force"] = True
