@@ -3,6 +3,8 @@ channels:
   - conda-forge
 dependencies:
   - python=3.11
+  - rdkit
+  - dssp=4.5.3  # 4.6.1 build has a broken mkdssp (libcifpp symbol mismatch)
   - pip
   - pip:
-      - pandamap>=4.3
+      - pandamap[full]>=4.3

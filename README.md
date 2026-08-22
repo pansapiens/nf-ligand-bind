@@ -60,12 +60,28 @@ with forced (restrained) backbone coordinates by default:
 ### PandaMap interaction analysis
 
 Each Boltz-predicted complex (model_0) is passed to
-[PandaMap](https://github.com/pritampanda15/PandaMap), publishing interaction
-diagram, contact CSV, text report and graphical report to
+[PandaMap](https://github.com/pritampanda15/PandaMap) for full analysis
+(interaction diagram, contact CSV, text report, four-panel graphical report,
+3D HTML viewer and empirical binding free energy estimate), publishing to
 `results/pandamap/{target}/{inchikey}/`. Dependencies are declared as a conda
-recipe with PyPI packages (`envs/pandamap.yml`); run it with `-profile conda`
-(env built from the recipe) or `-profile wave` (Seqera Wave builds a container
-from the same recipe for docker/apptainer execution).
+recipe with PyPI packages (`envs/pandamap.yml`: `pandamap[full]` plus rdkit
+and dssp from conda-forge, pinned to dssp 4.5.3 - the 4.6.1 build ships a
+broken mkdssp). Two execution modes:
+
+- `-profile conda`: conda env built locally from the recipe.
+- default (docker/apptainer): a container built from the same recipe by
+  [Seqera Wave](https://docs.seqera.io/wave/cli/) is pinned in the module via
+  its content-addressed tag. Rebuild with:
+  `wave --conda-file envs/pandamap.yml --await --platform linux/amd64`
+  and update the container directive in `modules/pandamap.nf`.
+
+  Note: global `wave.enabled = true` (a `-profile wave`) is deliberately NOT
+  used - it re-resolves every container reference through wave.seqera.io
+  mirrors, re-pulling images already in the local apptainer cache. Two upstream quirks are worked around inside the
+process: PandaMap calls the DSSP binary as `dssp` while conda-forge ships
+`mkdssp` (a task-local symlink bridges this), and Boltz's 4-character `LIG1`
+ligand residue name breaks the PDB temp file PandaMap feeds to DSSP (renamed
+to `LIG` in the input CIF).
 
 ### Score merging
 
