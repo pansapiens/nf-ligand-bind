@@ -63,7 +63,10 @@ Each Boltz-predicted complex (model_0) is passed to
 [PandaMap](https://github.com/pritampanda15/PandaMap) for full analysis
 (interaction diagram, contact CSV, text report, four-panel graphical report,
 3D HTML viewer and empirical binding free energy estimate), publishing to
-`results/pandamap/{target}/{inchikey}/`. Dependencies are declared as a conda
+`results/pandamap/{boltz,dynamicbind}/{target}/{inchikey}/` (Boltz model_0
+structures and DynamicBind rank1 pose complexes respectively; the
+dynamicbind branch only produces tasks in pose mode,
+`--dynamicbind_output_poses`). Dependencies are declared as a conda
 recipe with PyPI packages (`envs/pandamap.yml`: `pandamap[full]` plus rdkit
 and dssp from conda-forge, pinned to dssp 4.5.3 - the 4.6.1 build ships a
 broken mkdssp). Two execution modes:
