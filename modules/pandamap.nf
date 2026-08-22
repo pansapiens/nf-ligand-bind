@@ -1,5 +1,5 @@
 process PANDAMAP {
-    tag "${meta.id}"
+    tag "${meta.source}/${meta.id}"
 
     // Wave-built container from envs/pandamap.yml (pandamap[full] + rdkit +
     // dssp=4.5.3 from conda-forge), built with the Wave CLI:
@@ -10,7 +10,7 @@ process PANDAMAP {
     container 'wave.seqera.io/wt/72fd15bd5001/wave/build:pandamap--196a145310186261'
     conda "${projectDir}/envs/pandamap.yml"
 
-    publishDir "${params.outdir}/pandamap/${meta.target}/${meta.inchikey}", mode: 'copy'
+    publishDir "${params.outdir}/pandamap/${meta.source}/${meta.target}/${meta.inchikey}", mode: 'copy'
 
     input:
     tuple val(meta), path(structure)
@@ -37,10 +37,15 @@ process PANDAMAP {
     # Boltz names the ligand residue LIG1 (4 chars). BioPython's PDB writer,
     # used internally by PandaMap for its DSSP temp file, shifts columns on
     # 4-char residue names and mkdssp then rejects the file - so DSSP always
-    # silently falls back to the geometric method. Rename to 3-char LIG.
-    sed 's/LIG1/LIG /g' '${structure}' > pandamap_input.cif
+    # silently falls back to the geometric method. Rename to 3-char LIG
+    # (DynamicBind complexes already use a 3-char UNK name; sed is a no-op).
+    # Keep the input's own extension: PandaMap selects its parser by suffix
+    # (Boltz -> .cif, DynamicBind -> .pdb).
+    infile="${structure}"
+    ext="\${infile##*.}"
+    sed 's/LIG1/LIG /g' "\$infile" > "pandamap_input.\${ext}"
 
-    pandamap 'pandamap_input.cif' \\
+    pandamap "pandamap_input.\${ext}" \\
         ${ligand_flag} \\
         -o interactions.png \\
         --report --report-file report.txt \\

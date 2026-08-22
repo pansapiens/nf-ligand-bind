@@ -23,7 +23,6 @@ include { DYNAMICBIND } from './modules/dynamicbind'
 include { CREATE_BOLTZ_YAML_LIGAND ; BOLTZ_LIGAND } from './modules/boltz_ligand'
 include { PANDAMAP } from './modules/pandamap'
 include { MERGE_AFFINITY } from './modules/merge_affinity'
-
 process ADD_INCHIKEY {
     tag "add_inchikey"
     // boltz image has rdkit + /usr/bin/ps (needed for Nextflow metrics under --cleanenv)
@@ -55,11 +54,35 @@ workflow {
 
     ch_boltz_scores = Channel.empty()
     ch_dynamicbind_scores = Channel.empty()
+    ch_pandamap_sources = Channel.empty()
 
     // Run DynamicBind (unless skipped)
     if (!params.skip_dynamicbind) {
         DYNAMICBIND(ch_target_pdbs, ch_ligand_csv, 20, 3, params.dynamicbind_output_poses)
         ch_dynamicbind_scores = DYNAMICBIND.out.scores_csv
+
+        // PandaMap on DynamicBind rank1 pose complexes (only emitted in pose
+        // mode; HTS mode emits no rank1 files so this channel stays empty)
+        ch_pandamap_sources = ch_pandamap_sources.mix(
+            DYNAMICBIND.out.rank1_complexes
+                .map { target, complexes ->
+                    // single-match path outputs emit a bare Path, not a list
+                    def files = complexes == null ? []
+                        : (complexes instanceof List ? complexes : [complexes])
+                    files.collect { complex ->
+                        [
+                            [
+                                id: "${target}_${complex.parent.name}",
+                                target: target,
+                                inchikey: complex.parent.name,
+                                source: 'dynamicbind',
+                            ],
+                            complex,
+                        ]
+                    }
+                }
+                .flatMap()
+        )
     }
 
     // Run Boltz ligand prediction (unless skipped)
@@ -96,10 +119,16 @@ workflow {
         BOLTZ_LIGAND(CREATE_BOLTZ_YAML_LIGAND.out)
         ch_boltz_scores = BOLTZ_LIGAND.out.scores_csv
 
-        // PandaMap interaction analysis on predicted Boltz structures
-        if (!params.skip_pandamap) {
-            PANDAMAP(BOLTZ_LIGAND.out.predicted_structure)
-        }
+        // PandaMap on predicted Boltz structures
+        ch_pandamap_sources = ch_pandamap_sources.mix(
+            BOLTZ_LIGAND.out.predicted_structure
+                .map { meta, structure -> [meta + [source: 'boltz'], structure] }
+        )
+    }
+
+    // PandaMap interaction analysis (results/pandamap/{boltz,dynamicbind}/...)
+    if (!params.skip_pandamap) {
+        PANDAMAP(ch_pandamap_sources)
     }
 
     // Collect per-task score CSVs as file lists. Column-aligned concatenation

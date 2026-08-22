@@ -20,6 +20,7 @@ process DYNAMICBIND {
     // Use rank* globs so DynamicBind's intermediate data/*.pdb is not published.
     path "*/rank*.pdb", emit: poses_pdb, optional: true
     path "*/rank*.sdf", emit: poses_sdf, optional: true
+    tuple val("${target_pdb.simpleName}"), path("*/rank1_complex*_relaxed.pdb"), emit: rank1_complexes, optional: true
 
     script:
     def args = task.ext.args ?: ''
