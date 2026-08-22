@@ -16,9 +16,12 @@ params.use_msa_server = false
 params.skip_dynamicbind = false
 params.skip_boltz = false
 params.dynamicbind_output_poses = false
+params.skip_pandamap = false
+params.pandamap_ligand_resname = null
 
 include { DYNAMICBIND } from './modules/dynamicbind'
 include { CREATE_BOLTZ_YAML_LIGAND ; BOLTZ_LIGAND } from './modules/boltz_ligand'
+include { PANDAMAP } from './modules/pandamap'
 include { MERGE_AFFINITY } from './modules/merge_affinity'
 
 process ADD_INCHIKEY {
@@ -92,26 +95,24 @@ workflow {
         // Run Boltz predictions
         BOLTZ_LIGAND(CREATE_BOLTZ_YAML_LIGAND.out)
         ch_boltz_scores = BOLTZ_LIGAND.out.scores_csv
+
+        // PandaMap interaction analysis on predicted Boltz structures
+        if (!params.skip_pandamap) {
+            PANDAMAP(BOLTZ_LIGAND.out.predicted_structure)
+        }
     }
 
-    // Concatenate per-process score CSVs (nf-binder-design collectFile pattern)
+    // Collect per-task score CSVs as file lists. Column-aligned concatenation
+    // happens in MERGE_AFFINITY: different multimeric states emit different
+    // column counts (boltz2_pair_chains_iptm_* grows with chain number), which
+    // breaks naive text concatenation (collectFile keepHeader).
     ch_boltz_affinity = ch_boltz_scores
-        .collectFile(
-            name: 'boltz_affinity.csv',
-            storeDir: "${params.outdir}",
-            keepHeader: true,
-            skip: 1,
-        )
-        .ifEmpty(file("${projectDir}/assets/empty_scores.csv"))
+        .collect()
+        .ifEmpty([])
 
     ch_dynamicbind_affinity = ch_dynamicbind_scores
-        .collectFile(
-            name: 'dynamicbind_affinity.csv',
-            storeDir: "${params.outdir}",
-            keepHeader: true,
-            skip: 1,
-        )
-        .ifEmpty(file("${projectDir}/assets/empty_scores.csv"))
+        .collect()
+        .ifEmpty([])
 
     // Join Boltz2 + DynamicBind into a single master affinity table
     MERGE_AFFINITY(ch_boltz_affinity, ch_dynamicbind_affinity)

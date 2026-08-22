@@ -54,3 +54,23 @@ with forced (restrained) backbone coordinates by default:
 | `--use_msa_server` | off | fetch MSAs for Boltz (off by default; forced templates are usually sufficient) |
 | `--dynamicbind_output_poses` | off | run DynamicBind in pose-output mode instead of HTS screening |
 | `--skip_dynamicbind` / `--skip_boltz` | off | skip a predictor |
+| `--skip_pandamap` | off | skip PandaMap interaction analysis of Boltz predictions |
+| `--pandamap_ligand_resname` | auto | force PandaMap ligand residue name (default: auto-detect HETATM ligand) |
+
+### PandaMap interaction analysis
+
+Each Boltz-predicted complex (model_0) is passed to
+[PandaMap](https://github.com/pritampanda15/PandaMap), publishing interaction
+diagram, contact CSV, text report and graphical report to
+`results/pandamap/{target}/{inchikey}/`. Dependencies are declared as a conda
+recipe with PyPI packages (`envs/pandamap.yml`); run it with `-profile conda`
+(env built from the recipe) or `-profile wave` (Seqera Wave builds a container
+from the same recipe for docker/apptainer execution).
+
+### Score merging
+
+Per-task Boltz and DynamicBind score CSVs are merged column-aligned in
+`MERGE_AFFINITY` (different multimeric states emit different numbers of
+`boltz2_pair_chains_iptm_*` columns; text concatenation is not schema-safe).
+Outputs `affinity.csv` plus column-aligned `boltz_affinity.csv` /
+`dynamicbind_affinity.csv`.
