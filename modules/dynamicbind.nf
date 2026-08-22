@@ -15,7 +15,7 @@ process DYNAMICBIND {
     output:
     path "complete_affinity_prediction.csv", emit: complete_affinity_prediction_csv
     path "affinity_prediction.csv", emit: affinity_prediction_csv
-    path "dynamicbind_affinity.csv", emit: scores_csv
+    path "${target_pdb.simpleName}_dynamicbind_affinity.csv", emit: scores_csv
     // Pose files are produced in non-HTS mode; HTS affinity screening may omit them.
     // Use rank* globs so DynamicBind's intermediate data/*.pdb is not published.
     path "*/rank*.pdb", emit: poses_pdb, optional: true
@@ -28,14 +28,14 @@ process DYNAMICBIND {
     """
     mkdir -p data/esm2_output
 
-    # DynamicBind HTS reads protein_path from the CSV; point it at the staged PDB
+    # Keep rows for this target only; DynamicBind reads protein_path from the CSV
     python3 - <<'PY'
 import csv
 from pathlib import Path
 
 src = Path("${ligand_csv}")
 dst = Path("ligands_for_dynamicbind.csv")
-pdb = Path("${target_pdb}").name
+target_name = Path("${target_pdb}").name
 
 with src.open(newline="") as fin, dst.open("w", newline="") as fout:
     reader = csv.DictReader(fin)
@@ -43,9 +43,15 @@ with src.open(newline="") as fin, dst.open("w", newline="") as fout:
         raise SystemExit("ligands CSV must have a protein_path column")
     writer = csv.DictWriter(fout, fieldnames=reader.fieldnames)
     writer.writeheader()
+    rows = 0
     for row in reader:
-        row["protein_path"] = pdb
+        if Path(row["protein_path"]).name != target_name:
+            continue
+        row["protein_path"] = target_name
         writer.writerow(row)
+        rows += 1
+    if rows == 0:
+        raise SystemExit(f"No ligands matched target {target_name}")
 PY
 
     dynamicbind \
@@ -78,6 +84,6 @@ PY
     python3 ${projectDir}/bin/format_dynamicbind_affinity.py \
         affinity_prediction.csv \
         --ligands-csv ligands_for_dynamicbind.csv \
-        -o dynamicbind_affinity.csv
+        -o ${target_pdb.simpleName}_dynamicbind_affinity.csv
     """
 }

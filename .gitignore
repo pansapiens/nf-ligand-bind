@@ -1,5 +1,7 @@
 results*
 work
+examples/*/.nextflow*
+examples/*/*.log
 .nextflow/*
 .nextflow.log
 .nextflow.log.*

@@ -1,0 +1,7 @@
+name,pubchem_cid,description,chain_length,head_group,smiles,molecular_formula,molecular_weight,inchikey
+PFBA,9777,perfluorobutanoic acid,C4,carboxyl,C(=O)(C(C(C(F)(F)F)(F)F)(F)F)O,C4HF7O2,214.04,YPJUNDFVDDCYIH-UHFFFAOYSA-N
+PFHxA,67542,perfluorohexanoic acid,C6,carboxyl,C(=O)(C(C(C(C(C(F)(F)F)(F)F)(F)F)(F)F)(F)F)O,C6HF11O2,314.05,PXUULQAPEKKVAH-UHFFFAOYSA-N
+PFOA,9554,perfluorooctanoic acid,C8,carboxyl,C(=O)(C(C(C(C(C(C(C(F)(F)F)(F)F)(F)F)(F)F)(F)F)(F)F)(F)F)O,C8HF15O2,414.07,SNGREZUHAYWORS-UHFFFAOYSA-N
+PFBS,67815,perfluorobutanesulfonic acid,C4,sulfonyl,C(C(C(F)(F)S(=O)(=O)O)(F)F)(C(F)(F)F)(F)F,C4HF9O3S,300.10,JGTNAGYHADQMCM-UHFFFAOYSA-N
+PFHxS,67734,perfluorohexanesulfonic acid,C6,sulfonyl,C(C(C(C(F)(F)S(=O)(=O)O)(F)F)(F)F)(C(C(F)(F)F)(F)F)(F)F,C6HF13O3S,400.12,QZHDEAJFRJCDMF-UHFFFAOYSA-N
+PFOS,74483,perfluorooctanesulfonic acid,C8,sulfonyl,C(C(C(C(C(F)(F)S(=O)(=O)O)(F)F)(F)F)(F)F)(C(C(C(F)(F)F)(F)F)(F)F)(F)F,C8HF17O3S,500.13,YFSUTJLHUFNCNZ-UHFFFAOYSA-N

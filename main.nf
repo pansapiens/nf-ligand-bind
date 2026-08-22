@@ -2,7 +2,6 @@
 nextflow.enable.dsl = 2
 
 params.outdir = "results"
-params.target_pdbs = "input/*.pdb"
 params.ligand_csv = "input/ligands.csv"
 // Boltz templates: the target structure is passed as a template with a forced
 // (restrained) backbone by default; --flexible relaxes the force restraints.
@@ -46,11 +45,24 @@ process ADD_INCHIKEY {
 }
 
 workflow {
-    ch_target_pdbs = Channel.fromPath(params.target_pdbs)
-    ch_input_ligand_csv = file(params.ligand_csv)
+    def input_ligand_csv = file(params.ligand_csv)
 
     // Add InChIKey column and parse augmented ligands CSV
-    ch_ligand_csv = ADD_INCHIKEY(ch_input_ligand_csv)
+    ch_ligand_csv = ADD_INCHIKEY(input_ligand_csv)
+
+    // One channel item per target:ligand row; protein_path resolves relative to the CSV
+    ch_pairs = ch_ligand_csv
+        .splitCsv(header: true)
+        .map { row ->
+            def protein_path = row.protein_path?.trim()
+            if (!protein_path) {
+                error("ligands CSV row missing protein_path (ligand=${row.ligand})")
+            }
+            def target_pdb = input_ligand_csv.parent.resolve(protein_path)
+            def ligand_id = row.inchikey ?: row.ligand.take(20).replaceAll(/[^a-zA-Z0-9-]/, '_')
+            def target_id = target_pdb.baseName
+            tuple(target_id, target_pdb, ligand_id, row.ligand as String)
+        }
 
     ch_boltz_scores = Channel.empty()
     ch_dynamicbind_scores = Channel.empty()
@@ -58,7 +70,11 @@ workflow {
 
     // Run DynamicBind (unless skipped)
     if (!params.skip_dynamicbind) {
-        DYNAMICBIND(ch_target_pdbs, ch_ligand_csv, 20, 3, params.dynamicbind_output_poses)
+        ch_unique_target_pdbs = ch_pairs
+            .map { target_id, target_pdb, ligand_id, smiles -> target_pdb }
+            .unique()
+
+        DYNAMICBIND(ch_unique_target_pdbs, ch_ligand_csv, 20, 3, params.dynamicbind_output_poses)
         ch_dynamicbind_scores = DYNAMICBIND.out.scores_csv
 
         // PandaMap on DynamicBind rank1 pose complexes (only emitted in pose
@@ -87,29 +103,9 @@ workflow {
 
     // Run Boltz ligand prediction (unless skipped)
     if (!params.skip_boltz) {
-        // Prepare target channel with metadata
-        ch_targets = Channel.fromPath(params.target_pdbs)
-            .map { pdb ->
-                def name = pdb.baseName
-                [[id: name], pdb]
-            }
-
-        // Parse augmented ligands CSV
-        ch_ligands = ch_ligand_csv
-            .splitCsv(header: true)
-            .map { row ->
-                def ligand_id = row.inchikey ?: row.ligand.take(20).replaceAll(/[^a-zA-Z0-9-]/, '_')
-                [
-                    id: ligand_id,
-                    smiles: row.ligand,
-                ]
-            }
-
-        // Create all target-ligand combinations
-        ch_target_ligand_pairs = ch_targets
-            .combine(ch_ligands)
-            .map { target_meta, target_pdb, ligand_meta ->
-                [target_meta, target_pdb, ligand_meta]
+        ch_target_ligand_pairs = ch_pairs
+            .map { target_id, target_pdb, ligand_id, smiles ->
+                [[id: target_id], target_pdb, [id: ligand_id, smiles: smiles]]
             }
 
         // Generate YAML files for each target-ligand pair
